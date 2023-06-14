@@ -1,10 +1,12 @@
 import cv2
 import numpy as np
 import torch
+import albumentations.pytorch
 import albumentations as A
 
+
 class maskDataset:
-    def __init__(self, df, mode="train", CFG=CFG):
+    def __init__(self, df, CFG, mode="train"):
         self.mode = mode
         self.transform = {
             "train": A.Compose([
@@ -39,7 +41,7 @@ class maskDataset:
         if self.transform:
             data = self.transform(image=image, mask=mask)
             image, mask = data["image"], data["mask"]
-        return image.to(torch.float16), mask.to(torch.float16)
+        return image, mask
     
     def __len__(self):
         return len(self.df)

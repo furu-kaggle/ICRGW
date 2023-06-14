@@ -1,10 +1,13 @@
-import os
+import os, glob
 import torch
 from torch import nn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
 import torch.optim as optim
+
 import timm
+import timm.scheduler
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -14,16 +17,24 @@ from torch.nn.modules.batchnorm import _BatchNorm
 from .model import UNet
 from .dataset import maskDataset
 
+import torch._dynamo
+
 
 class Trainer:
     def __init__(self, CFG, train, valid):
+        torch._dynamo.reset()
         self.CFG = CFG
         self.validation_losses = []
         self.epoch_losses = []
         self.learning_rates = []
         self.cumulative_mask_pred = []
         self.cumulative_mask_true = []
-        self.model = UNet(CFG=CFG).to(CFG.device)
+        model = UNet(CFG=CFG).to(CFG.device)
+        #try:
+        #    self.model = torch.compile(model, mode="max-autotune")
+        #except:
+        #    print("torch version < 2.0.0 so we don't apply torch.compile ")
+        self.model = model
         self.ema_model = timm.utils.ModelEmaV2(self.model, decay=CFG.ema_decay)
         group_decay_encoder, group_no_decay_encoder = self.group_weight(self.model.model.encoder)
         group_decay_decoder, group_no_decay_decoder = self.group_weight(self.model.model.decoder)
@@ -46,11 +57,11 @@ class Trainer:
         )
         self.data_loader_validation = DataLoader(
             dataset_validation, 
-            batch_size=4, 
-            shuffle=False, 
+            batch_size=os.cpu_count(), 
+            shuffle=False,
             pin_memory=True,
-            drop_last=True, 
-            num_workers=2
+            drop_last=True,
+            num_workers=os.cpu_count()
         )
         self.lr_scheduler = timm.scheduler.CosineLRScheduler(
             self.optimizer,
@@ -60,7 +71,7 @@ class Trainer:
         )
         self.best_score = 0
         
-    def get_threshold(self):
+    def get_threshold(self, e):
         self.model.eval()
         self.cumulative_mask_pred = []
         self.cumulative_mask_true = []
@@ -70,7 +81,7 @@ class Trainer:
             for i, (images, mask) in pbar:
                 images = images.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
                 mask = mask.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
-                mask_pred = self.model.validate_forward(images,valid_size=512)
+                mask_pred = self.model.validate_forward(images)
                 loss = self.model.loss_fn(mask_pred, mask)
                 losses.append(loss.item())
                 self.cumulative_mask_pred.append(mask_pred.sigmoid())
@@ -105,7 +116,8 @@ class Trainer:
         plt.text(optim_threshold - 0.01, 0.02, f'{optim_threshold}', va='center', ha='right', color='green')
         plt.ylim(bottom=0)
         plt.title('Threshold vs Dice Score')
-        plt.show()
+        plt.savefig(f'checkpoint/thre-dice-relation_{best_dice_score:.3f}.png')
+        plt.clf()
         print("Validation loss after", round(avg_loss, 4))
         return best_dice_score
 
@@ -184,9 +196,11 @@ class Trainer:
             print('Train Epoch: {} Average Loss: {:.6f}'.format(e, total_loss/total_nums))
 
             if e >= 0:
-                torch.save(self.model.model.state_dict(), "model_checkpoint_e" + str(e) + ".pt")
-                best_dice_score = self.get_threshold()
+                best_dice_score = self.get_threshold(e)
                 if self.best_score < best_dice_score:
                     self.best_score = best_dice_score
+                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}.pt")
+                    for path in sorted(glob.glob("checkpoint/model_checkpoint_*.pt"), reverse=True)[1:]:
+                        os.remove(path)
         
         return self.best_score

@@ -4,10 +4,10 @@ import os, glob, cv2, random, json
 from tqdm import tqdm
 import optuna
 import matplotlib.pyplot as plt
-import torch    
+import torch
+
 torch.backends.cudnn.benchmark = True
-torch.autograd.set_detect_anomaly(False)
-torch.set_flush_denormal(True)
+torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
 
@@ -17,20 +17,20 @@ class CFG:
     encoder_weight= "noisy-student" #timm [imagenet / advprop / noisy-student]
     pretrain      = True
     pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
-    img_size      = [512, 512]
-    crop_size     = [448, 448]
+    img_size      = [256, 256]
+    crop_size     = [256, 256]
     sub_img_size  = [256, 256]
-    valid_size    = [512, 512]
+    valid_size    = [256, 256]
     batch_size    = 16
-    epochs        = 20
-    lr            = 7.5e-3
-    lr_min        = 1e-4
-    enc_ratio     = 0.01
+    epochs        = 1
+    lr            = 0.0025
+    lr_min        = 8e-05
+    enc_ratio     = 0.1
     weight_decay  = 0.01
     ema_decay     = 0.99
     n_fold        = 5
     num_classes   = 1
-    alpha         = 0.25
+    alpha         = 0.1
     device        = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     train         = True
     probe_thre    = False
@@ -38,12 +38,10 @@ class CFG:
     weight_path   = None#"/kaggle/input/ic-rgwweights/model_checkpoint_e18.pt"
     inp_mode = 'bilinear'
 
-train = pd.read_parquet("data/ic-rgw-basic-eda/train.parquet")
-valid = pd.read_parquet("data/ic-rgw-basic-eda/validation.parquet")
+train = pd.read_parquet("data/train.parquet")
+valid = pd.read_parquet("data/validation.parquet")
 
-#valid = valid[valid.has_mask.astype(bool)].reset_index(drop=True)
-
-pdf = pd.DataFrame(glob.glob("/kaggle/input/ic-rgwbaseline-simple-rgw/*/"),columns=["path"])
+pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path"])
 pdf["record_id"] = pdf.path.apply(lambda x: x.split("/")[-2])
 train = pd.merge(train,pdf,on=["record_id"])
 valid = pd.merge(valid,pdf,on=["record_id"])
@@ -58,6 +56,7 @@ class Objective:
     def __init__(self, CFG, trainer_class):
         self.CFG = CFG
         self.trainer_class = trainer_class
+        self.best_score = 0
 
     def __call__(self, trial):
         # suggest parameters
@@ -68,18 +67,19 @@ class Objective:
 
         # create trainer with suggested parameters
         trainer = self.trainer_class(CFG=self.CFG, train=train, valid=valid)
+        trainer.best_score = self.best_score
 
         # train model and get best score
-        best_score = trainer.fit(epochs=self.CFG.epochs)
+        self.best_score = trainer.fit(epochs=self.CFG.epochs)
 
-        return best_score
+        return self.best_score
 
 import datetime
 # Get current date and time
 now = datetime.datetime.now()
 
 # Format as a string
-now_str = now.strftime('%Y%m%d_%H%M%S')
+now_str = now.strftime('%Y%m%d')
 
 # Use in database file name
 db_file = f'sqlite:///try_{now_str}.db'
@@ -92,8 +92,7 @@ def optimize(CFG, trainer_class, n_trials=100):
     study.optimize(objective, n_trials=n_trials)
 
     # Plotting importance
-    fig, ax = plt.subplots()
-    optuna.visualization.plot_param_importances(study, ax=ax)
+    optuna.visualization.plot_param_importances(study)
     plt.savefig(f'checkpoint/importances_{now_str}.png')
 
     # Save best params as json
@@ -101,4 +100,4 @@ def optimize(CFG, trainer_class, n_trials=100):
         json.dump(study.best_params, f)
 
 # use the function
-optimize(CFG, Trainer, n_trials=10)
+optimize(CFG, Trainer, n_trials=2)

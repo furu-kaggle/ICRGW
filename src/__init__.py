@@ -1,4 +1,3 @@
-from .datasets import WaveformDataset
-from .eval_datasets import EvalWaveformDataset
-from .models import Model
+from .dataset import maskDataset
+from .model import UNet
 from .Trainer import Trainer
