@@ -21,7 +21,7 @@ class CFG:
     crop_size     = [256, 256]
     sub_img_size  = [256, 256]
     valid_size    = [256, 256]
-    batch_size    = 16
+    batch_size    = 64
     epochs        = 1
     lr            = 0.0025
     lr_min        = 8e-05
@@ -90,14 +90,16 @@ def optimize(CFG, trainer_class, n_trials=100):
     objective = Objective(CFG, trainer_class)
     study = optuna.create_study(study_name=f'trial_{now_str}', storage=db_file, direction="maximize")
     study.optimize(objective, n_trials=n_trials)
+    study.trials_dataframe().to_csv(f'checkpoint/trials_{now_str}.csv', index=False)
 
-    # Plotting importance
-    optuna.visualization.plot_param_importances(study)
-    plt.savefig(f'checkpoint/importances_{now_str}.png')
+    # Get parameter importances
+    importances = optuna.importance.get_param_importances(study)
+    # Convert to DataFrame and save
+    pd.DataFrame(list(importances.items()), columns=['parameter', 'importance']).to_csv(f'checkpoint/importances_{now_str}.csv', index=False)
 
     # Save best params as json
     with open(f'checkpoint/best_params_{now_str}.json', 'w') as f:
         json.dump(study.best_params, f)
 
 # use the function
-optimize(CFG, Trainer, n_trials=2)
+optimize(CFG, Trainer, n_trials=5)
