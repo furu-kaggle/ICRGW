@@ -10,33 +10,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-
-class CFG:
-    seed          = 101
-    backbone      = 'timm-efficientnet-b0'
-    encoder_weight= "noisy-student" #timm [imagenet / advprop / noisy-student]
-    pretrain      = True
-    pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
-    img_size      = [256, 256]
-    crop_size     = [256, 256]
-    sub_img_size  = [256, 256]
-    valid_size    = [256, 256]
-    batch_size    = 64
-    epochs        = 1
-    lr            = 0.0025
-    lr_min        = 8e-05
-    enc_ratio     = 0.1
-    weight_decay  = 0.01
-    ema_decay     = 0.99
-    n_fold        = 5
-    num_classes   = 1
-    alpha         = 0.1
-    device        = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train         = True
-    probe_thre    = False
-    img_show      = False
-    weight_path   = None#"/kaggle/input/ic-rgwweights/model_checkpoint_e18.pt"
-    inp_mode = 'bilinear'
+from cfg.resnext50_32x4d import CFG
 
 train = pd.read_parquet("data/train.parquet")
 valid = pd.read_parquet("data/validation.parquet")
@@ -60,8 +34,8 @@ class Objective:
 
     def __call__(self, trial):
         # suggest parameters
-        self.CFG.lr = trial.suggest_float("lr", 5e-4, 8e-3,step=5e-4)
-        self.CFG.alpha = trial.suggest_float("alpha", 0.1, 0.9, step=0.01)
+        self.CFG.lr = trial.suggest_float("lr", 1e-3, 8e-3,step=1e-3)
+        self.CFG.alpha = trial.suggest_float("alpha", 0.1, 0.5, step=0.05)
         self.CFG.enc_ratio = trial.suggest_float("enc_ratio", 0.05, 0.15,step=0.01)
         self.CFG.lr_min = trial.suggest_float("lr_min", 5e-5,5e-4,step=1e-5)
 
@@ -102,4 +76,4 @@ def optimize(CFG, trainer_class, n_trials=100):
         json.dump(study.best_params, f)
 
 # use the function
-optimize(CFG, Trainer, n_trials=5)
+optimize(CFG, Trainer, n_trials=10)

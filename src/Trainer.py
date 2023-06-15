@@ -30,11 +30,11 @@ class Trainer:
         self.cumulative_mask_pred = []
         self.cumulative_mask_true = []
         model = UNet(CFG=CFG).to(CFG.device)
-        #try:
-        #    self.model = torch.compile(model, mode="max-autotune")
-        #except:
-        #    print("torch version < 2.0.0 so we don't apply torch.compile ")
-        self.model = model
+        try:
+            self.model = torch.compile(model, mode="max-autotune")
+        except:
+            print("torch version < 2.0.0 so we don't apply torch.compile ")
+            self.model = model
         self.ema_model = timm.utils.ModelEmaV2(self.model, decay=CFG.ema_decay)
         group_decay_encoder, group_no_decay_encoder = self.group_weight(self.model.model.encoder)
         group_decay_decoder, group_no_decay_decoder = self.group_weight(self.model.model.decoder)
