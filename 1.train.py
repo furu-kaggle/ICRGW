@@ -10,7 +10,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.resnext50_32x4d import CFG
+from cfg.effb1_ns import CFG
 
 train = pd.read_parquet("data/train.parquet")
 valid = pd.read_parquet("data/validation.parquet")
@@ -21,11 +21,6 @@ train = pd.merge(train,pdf,on=["record_id"])
 valid = pd.merge(valid,pdf,on=["record_id"])
 
 from src import Trainer
-#debug
-#trainer = Trainer(CFG=CFG,train=train,valid=valid)
-#best_score = trainer.fit(epochs=CFG.epochs)
-#model = trainer.model.eval()
-
 class Objective:
     def __init__(self, CFG, trainer_class):
         self.CFG = CFG
@@ -63,6 +58,14 @@ db_file = f'sqlite:///try_{now_str}.db'
 def optimize(CFG, trainer_class, n_trials=100):
     objective = Objective(CFG, trainer_class)
     study = optuna.create_study(study_name=f'trial_{now_str}', storage=db_file, direction="maximize")
+    study.enqueue_trial(
+        {
+            'lr': CFG.lr, 
+            'alpha': CFG.alpha, 
+            'enc_ratio': CFG.enc_ratio, 
+            'lr_min': CFG.lr_min
+        }
+    )
     study.optimize(objective, n_trials=n_trials)
     study.trials_dataframe().to_csv(f'checkpoint/trials_{now_str}.csv', index=False)
 

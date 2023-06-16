@@ -17,12 +17,11 @@ from torch.nn.modules.batchnorm import _BatchNorm
 from .model import UNet
 from .dataset import maskDataset
 
-import torch._dynamo
+
 
 
 class Trainer:
     def __init__(self, CFG, train, valid):
-        torch._dynamo.reset()
         self.CFG = CFG
         self.validation_losses = []
         self.epoch_losses = []
@@ -31,6 +30,8 @@ class Trainer:
         self.cumulative_mask_true = []
         model = UNet(CFG=CFG).to(CFG.device)
         try:
+            import torch._dynamo
+            torch._dynamo.reset()
             self.model = torch.compile(model, mode="max-autotune")
         except:
             print("torch version < 2.0.0 so we don't apply torch.compile ")
