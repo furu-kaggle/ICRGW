@@ -10,7 +10,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.effb1_ns import CFG
+from cfg.resnet50_ssl import CFG
 
 train = pd.read_parquet("data/train.parquet")
 valid = pd.read_parquet("data/validation.parquet")
@@ -29,8 +29,8 @@ class Objective:
 
     def __call__(self, trial):
         # suggest parameters
-        self.CFG.lr = trial.suggest_float("lr", 1e-3, 8e-3,step=1e-3)
-        self.CFG.alpha = trial.suggest_float("alpha", 0.1, 0.5, step=0.05)
+        self.CFG.lr = trial.suggest_float("lr", 4e-3, 8e-3,step=1e-3)
+        self.CFG.alpha = trial.suggest_float("alpha", 0.1, 0.3, step=0.05)
         self.CFG.enc_ratio = trial.suggest_float("enc_ratio", 0.05, 0.15,step=0.01)
         self.CFG.lr_min = trial.suggest_float("lr_min", 5e-5,5e-4,step=1e-5)
 
@@ -40,6 +40,9 @@ class Objective:
 
         # train model and get best score
         self.best_score = trainer.fit(epochs=self.CFG.epochs)
+        # clear GPU cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return self.best_score
 
@@ -79,4 +82,4 @@ def optimize(CFG, trainer_class, n_trials=100):
         json.dump(study.best_params, f)
 
 # use the function
-optimize(CFG, Trainer, n_trials=10)
+optimize(CFG, Trainer, n_trials=5)

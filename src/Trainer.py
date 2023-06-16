@@ -58,11 +58,11 @@ class Trainer:
         )
         self.data_loader_validation = DataLoader(
             dataset_validation, 
-            batch_size=os.cpu_count(), 
+            batch_size=2, 
             shuffle=False,
             pin_memory=True,
             drop_last=True,
-            num_workers=os.cpu_count()
+            num_workers=2
         )
         self.lr_scheduler = timm.scheduler.CosineLRScheduler(
             self.optimizer,
