@@ -6,7 +6,7 @@ class UNet(nn.Module):
     def __init__(self, CFG):
         super(UNet, self).__init__()
         self.CFG = CFG
-        self.model = smp.Unet(
+        self.model = smp.UnetPlusPlus(
             encoder_name=CFG.backbone,     
             encoder_weights=CFG.encoder_weight if CFG.pretrain else None,
             in_channels=3,        
