@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch.nn.modules.batchnorm import _BatchNorm
 
-from .model import UNet
-from .dataset import maskDataset
+from .model import UNet, MultiTimeUNet
+from .dataset import maskDataset, timemaskDataset
 
 
 

@@ -7,10 +7,10 @@ class CFG:
     pretrain      = True
     encoder_weight= "noisy-student" #"imagenet" #timm [imagenet / advprop / noisy-student]
     pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
-    img_size      = [512, 512]
-    crop_size     = [512, 512]
+    img_size      = [384, 384]
+    crop_size     = [384, 384]
     sub_img_size  = [256, 256]
-    valid_size    = [512, 512]
+    valid_size    = [384, 384]
     epochs        = 30
     lr_epochs     = 30
     batch_size    = 16
