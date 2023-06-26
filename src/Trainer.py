@@ -200,8 +200,8 @@ class Trainer:
                 best_dice_score = self.get_threshold(e)
                 if self.best_score < best_dice_score:
                     self.best_score = best_dice_score
-                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}.pt")
-                    for path in sorted(glob.glob("checkpoint/model_checkpoint_*.pt"), reverse=True)[1:]:
+                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{self.CFG.fold}_{best_dice_score:.3f}.pt")
+                    for path in sorted(glob.glob(f"checkpoint/model_checkpoint_{self.CFG.fold}_*.pt"), reverse=True)[1:]:
                         os.remove(path)
         
         return self.best_score
