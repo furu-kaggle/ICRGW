@@ -10,15 +10,20 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.effb1_ns import CFG
+from cfg.resnet18_ssl import CFG
 
 train = pd.read_parquet("data/train.parquet")
 valid = pd.read_parquet("data/validation.parquet")
 
-pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path"])
-pdf["record_id"] = pdf.path.apply(lambda x: x.split("/")[-2])
+pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path4"])
+pdf["record_id"] = pdf.path4.apply(lambda x: x.split("/")[-2])
 train = pd.merge(train,pdf,on=["record_id"])
 valid = pd.merge(valid,pdf,on=["record_id"])
+
+for i in [0,1,2,3,5,6,7]:
+    pdf = pd.DataFrame(glob.glob(f"data/ash{i}/*/"),columns=[f"path{i}"])
+    pdf["record_id"] = pdf[f"path{i}"].apply(lambda x: x.split("/")[-2])
+    train = pd.merge(train,pdf,on=["record_id"])
 
 from src import Trainer
 class Objective:
@@ -82,4 +87,4 @@ def optimize(CFG, trainer_class, n_trials=100):
         json.dump(study.best_params, f)
 
 # use the function
-optimize(CFG, Trainer, n_trials=5)
+optimize(CFG, Trainer, n_trials=20)

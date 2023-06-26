@@ -10,7 +10,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.effb1_ns import CFG
+from cfg.resnet18_ssl import CFG
 
 train = pd.read_parquet("data/train.parquet")
 valid = pd.read_parquet("data/validation.parquet")

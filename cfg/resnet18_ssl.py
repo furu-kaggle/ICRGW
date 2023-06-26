@@ -3,8 +3,8 @@ import torch
 
 class CFG:
     seed          = 101
-    backbone      = 'resnet50'
-    encoder_weight= "ssl" #timm [imagenet / advprop / noisy-student]
+    backbone      = 'resnet18'
+    encoder_weight= "swsl" #timm [imagenet / advprop / noisy-student]
     pretrain      = True
     pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
     img_size      = [512, 512]
@@ -12,7 +12,7 @@ class CFG:
     sub_img_size  = [256, 256]
     valid_size    = [512, 512]
     batch_size    = 16
-    epochs        = 30
+    epochs        = 60
     lr            = 0.005
     lr_min        = 8e-05
     enc_ratio     = 0.1
