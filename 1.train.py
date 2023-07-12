@@ -18,7 +18,7 @@ valid = pd.read_parquet("data/validation.parquet")
 pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path4"])
 pdf["record_id"] = pdf.path4.apply(lambda x: x.split("/")[-2])
 train = pd.merge(train,pdf,on=["record_id"])
-valid = pd.merge(valid,pdf,on=["record_id"])
+valid = pd.merge(valid, pdf,on=["record_id"])
 
 for i in [0,1,2,3,5,6,7]:
     pdf = pd.DataFrame(glob.glob(f"data/ash{i}/*/"),columns=[f"path{i}"])

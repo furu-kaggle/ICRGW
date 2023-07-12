@@ -3,7 +3,7 @@ import torch
 
 class CFG:
     seed          = 101
-    backbone      = 'timm-efficientnet-b1'
+    backbone      = 'timm-efficientnet-b5'
     pretrain      = True
     encoder_weight= "noisy-student" #"imagenet" #timm [imagenet / advprop / noisy-student]
     pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
@@ -19,7 +19,7 @@ class CFG:
     enc_ratio     = 0.15
     weight_decay  = 0.01
     ema_decay     = 0.99
-    n_fold        = 5
+    fold          = 0
     num_classes   = 1
     alpha         = 0.12
     device        = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
