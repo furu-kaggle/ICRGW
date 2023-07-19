@@ -1,4 +1,4 @@
-import os, glob
+import os, glob, math
 import torch
 from torch import nn
 from torch.cuda.amp import autocast
@@ -46,27 +46,28 @@ class Trainer:
             {'params': group_no_decay_decoder, 'weight_decay':0.0}
         ], lr=CFG.lr, weight_decay=CFG.weight_decay)
         dataset_train = maskDataset(df=train,CFG=CFG)
-        dataset_validation = maskDataset(df=valid,CFG=CFG,mode="valid")
+        if self.CFG.fold != -1:
+            dataset_validation = maskDataset(df=valid,CFG=CFG,mode="valid")
 
-        self.data_loader_train = DataLoader(
-            dataset_train, 
-            batch_size=CFG.batch_size, 
-            shuffle=True,
-            pin_memory=True,
-            drop_last=True, 
-            num_workers=min(CFG.batch_size, os.cpu_count())
-        )
+            self.data_loader_train = DataLoader(
+                dataset_train, 
+                batch_size=CFG.batch_size, 
+                shuffle=True,
+                pin_memory=True,
+                drop_last=True, 
+                num_workers=min(CFG.batch_size, os.cpu_count())
+            )
         self.data_loader_validation = DataLoader(
             dataset_validation, 
-            batch_size=2, 
+            batch_size=16, 
             shuffle=False,
             pin_memory=True,
             drop_last=True,
-            num_workers=2
+            num_workers=16
         )
         self.lr_scheduler = timm.scheduler.CosineLRScheduler(
             self.optimizer,
-            t_initial=CFG.epochs*len(self.data_loader_train),
+            t_initial=CFG.lr_epochs*len(self.data_loader_train),
             lr_min=CFG.lr_min,
             t_in_epochs=True,
         )
@@ -148,7 +149,7 @@ class Trainer:
         assert len(list(module.parameters())) == len(group_decay) + len(group_no_decay)
         return group_decay, group_no_decay
         
-    def dice_score(self, inputs, targets, smooth=1):        
+    def dice_score(self, inputs, targets, smooth=1e-6):        
         intersection = (inputs.view(-1) * targets.view(-1)).sum()
         dice = (2.0 *intersection + smooth)/(inputs.sum() + targets.sum() + smooth)
         return dice
@@ -185,23 +186,35 @@ class Trainer:
 
                 total_loss += (loss.detach().item() * mask.size(0))
                 total_nums += mask.size(0)
+
+                if math.isnan(total_loss):
+                    print("NaN loss encountered. Breaking the loop.")
+                    break
                 
                 pbar.set_description("[loss %f, lr %e]" % (total_loss / total_nums, self.optimizer.param_groups[0]['lr']))
 
                 # Adjusts learning rate
                 if self.lr_scheduler is not None:
                     self.lr_scheduler.step(e*len(self.data_loader_train)+i)
-
+                    
+            if math.isnan(total_loss):
+                    print("NaN loss encountered. Breaking the loop.")
+                    break
             # Reports on the path
             self.epoch_losses.append(total_loss/total_nums)
             print('Train Epoch: {} Average Loss: {:.6f}'.format(e, total_loss/total_nums))
 
             if e >= 0:
-                best_dice_score = self.get_threshold(e)
-                if self.best_score < best_dice_score:
-                    self.best_score = best_dice_score
-                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}.pt")
-                    for path in sorted(glob.glob("checkpoint/model_checkpoint_*.pt"), reverse=True)[1:]:
-                        os.remove(path)
+                if self.CFG.fold == -1:
+                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{e}.pt")
+                else:
+                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{self.CFG.fold}_last.pt")
+                    best_dice_score = self.get_threshold(e)
+                    if self.best_score < best_dice_score:
+                        self.best_score = best_dice_score
+                        torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}_{self.CFG.fold}.pt")
+                        for path in sorted(glob.glob(f"checkpoint/model_checkpoint_*_{self.CFG.fold}.pt"), reverse=True)[1:]:
+                            os.remove(path)
+                    
         
         return self.best_score
