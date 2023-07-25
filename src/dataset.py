@@ -1,5 +1,6 @@
 import cv2, random
 import numpy as np
+import pandas as pd
 import torch
 import albumentations.pytorch
 import albumentations as A
@@ -33,22 +34,22 @@ class maskDataset:
                 ], p=1.0)
         }[mode]
         self.df = df
+        if self.mode=="train":
+            df_mask = self.df[self.df.has_mask.astype(bool)]
+            df_nomask = self.df[~self.df.has_mask.astype(bool)]
+            df_nomask = df_nomask[df_nomask.label_sum==0]
+            self.df = pd.concat([df_mask,df_nomask]).reset_index(drop=True)
+        self.dup_ids = self.df.dup_id.unique()
         
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        if self.mode=="train":
-            if row.has_mask:
-                sampling_timeid = 4
-            else:
-                sampling_timeid = random.randint(0,7)
-        else:
-            sampling_timeid = 4
-        try:
-            image = np.load(row[f"path{sampling_timeid}"] + "image.npy")*255.0
-        except:
-            print(row[f"path{sampling_timeid}"])
-            image = np.load(row[f"path4"] + "image.npy")*255.0
+        dup_idx = self.dup_ids[idx]
+        row = self.df[self.df.dup_id == dup_idx].sample(n=1).iloc[0]
+        image = np.load(row[f"path4"] + "image.npy")*255.0
         mask = np.load(row.path4 + "label.npy")
+        if (self.mode=="train")&(row.path != "nomask"):
+            mask_h = np.load(row.path)
+            mask_h = mask_h/row.human_sum * 0.5
+            mask = (mask + mask_h).clip(0,1)
         
         if self.transform:
             data = self.transform(image=image, mask=mask)
@@ -57,7 +58,7 @@ class maskDataset:
         return image, mask
     
     def __len__(self):
-        return len(self.df)
+        return len(self.dup_ids)
     
 
 class timemaskDataset:

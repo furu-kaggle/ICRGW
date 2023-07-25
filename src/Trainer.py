@@ -30,9 +30,9 @@ class Trainer:
         self.cumulative_mask_true = []
         model = UNet(CFG=CFG).to(CFG.device)
         try:
-            import torch._dynamo
-            torch._dynamo.reset()
-            self.model = torch.compile(model, mode="max-autotune")
+           import torch._dynamo
+           torch._dynamo.reset()
+           self.model = torch.compile(model, mode="max-autotune")
         except:
             print("torch version < 2.0.0 so we don't apply torch.compile ")
             self.model = model
@@ -58,11 +58,11 @@ class Trainer:
         )
         self.data_loader_validation = DataLoader(
             dataset_validation, 
-            batch_size=2, 
+            batch_size=16, 
             shuffle=False,
             pin_memory=True,
             drop_last=True,
-            num_workers=2
+            num_workers=8
         )
         self.lr_scheduler = timm.scheduler.CosineLRScheduler(
             self.optimizer,
@@ -145,6 +145,11 @@ class Trainer:
                     group_no_decay.append(m.weight)
                 if m.bias is not None:
                     group_no_decay.append(m.bias)
+            elif isinstance(m, nn.LayerNorm):
+                if m.weight is not None:
+                    group_no_decay.append(m.weight)
+                if m.bias is not None:
+                    group_no_decay.append(m.bias)
         assert len(list(module.parameters())) == len(group_decay) + len(group_no_decay)
         return group_decay, group_no_decay
         
@@ -196,12 +201,12 @@ class Trainer:
             self.epoch_losses.append(total_loss/total_nums)
             print('Train Epoch: {} Average Loss: {:.6f}'.format(e, total_loss/total_nums))
 
-            if e >= 0:
+            if e >= 24:
                 best_dice_score = self.get_threshold(e)
                 if self.best_score < best_dice_score:
                     self.best_score = best_dice_score
-                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}.pt")
-                    for path in sorted(glob.glob("checkpoint/model_checkpoint_*.pt"), reverse=True)[1:]:
+                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}_{self.CFG.fold}.pt")
+                    for path in sorted(glob.glob(f"checkpoint/model_checkpoint_*_{self.CFG.fold}.pt"), reverse=True)[1:]:
                         os.remove(path)
         
         return self.best_score

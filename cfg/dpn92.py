@@ -3,9 +3,9 @@ import torch
 
 class CFG:
     seed          = 101
-    backbone      = 'timm-efficientnet-b5'
+    backbone      = 'dpn92'
     pretrain      = True
-    encoder_weight= "noisy-student" #"imagenet" #timm [imagenet / advprop / noisy-student]
+    encoder_weight= "imagenet+5k" #"imagenet" #timm [imagenet / advprop / noisy-student]
     pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
     img_size      = [384, 384]
     crop_size     = [384, 384]

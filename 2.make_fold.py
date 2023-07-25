@@ -5,17 +5,25 @@ from tqdm import tqdm
 import optuna
 import matplotlib.pyplot as plt
 import torch
-
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.timm_resnest import CFG
+from cfg.mit import CFG
 
-df = pd.read_csv("data/train.csv")
+df = pd.read_csv("data/train.csv").drop(["path"],axis=1)
 pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path4"])
 pdf["record_id"] = pdf.path4.apply(lambda x: x.split("/")[-2]).astype(int)
 df = pd.merge(df,pdf,on=["record_id"])
+
+ndf = pd.DataFrame(glob.glob("data/ashfloat32/*/label_smooth_*.npy"),columns=["path"])
+ndf["record_id"] = ndf.path.apply(lambda x: x.split("/")[-2]).astype(int)
+df = df.merge(ndf,on=["record_id"],how="left")
+df["path"].fillna("nomask",inplace=True)
+
+print(df["path"])
 
 # for i in [0,1,2,3,5,6,7]:
 #     pdf = pd.DataFrame(glob.glob(f"data/ash{i}/*/"),columns=[f"path{i}"])
@@ -23,7 +31,7 @@ df = pd.merge(df,pdf,on=["record_id"])
 #     df = pd.merge(df,pdf,on=["record_id"])
 
 from src import Trainer
-for fold in [0,1,2,3]:
+for fold in [1]:
     CFG.fold = fold
     train = df[df.fold != fold].reset_index(drop=True)
     valid = df[df.fold == fold].reset_index(drop=True)
