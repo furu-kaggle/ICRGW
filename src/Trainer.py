@@ -146,6 +146,11 @@ class Trainer:
                     group_no_decay.append(m.weight)
                 if m.bias is not None:
                     group_no_decay.append(m.bias)
+            elif isinstance(m, nn.LayerNorm):
+                if m.weight is not None:
+                    group_no_decay.append(m.weight)
+                if m.bias is not None:
+                    group_no_decay.append(m.bias)
         assert len(list(module.parameters())) == len(group_decay) + len(group_no_decay)
         return group_decay, group_no_decay
         
@@ -175,12 +180,16 @@ class Trainer:
             for i, (images, mask) in pbar:
                 images = images.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
                 mask = mask.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
-                
+
                 with autocast():
                     loss = self.model(images, mask)
                 scaler.scale(loss).backward()
+                #scaler.unscale_(self.optimizer)
+                #_ = torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.CFG.max_grad_norm)
+                #_ = torch.nn.utils.clip_grad_norm_(self.ema_model.parameters(), self.CFG.max_grad_norm)
                 scaler.step(self.optimizer)
                 scaler.update()
+
                 self.optimizer.zero_grad()
                 self.ema_model.update(self.model)
 
@@ -199,7 +208,7 @@ class Trainer:
                     
             if math.isnan(total_loss):
                     print("NaN loss encountered. Breaking the loop.")
-                    break
+                    break                                                                                                                                                                                                                   
             # Reports on the path
             self.epoch_losses.append(total_loss/total_nums)
             print('Train Epoch: {} Average Loss: {:.6f}'.format(e, total_loss/total_nums))

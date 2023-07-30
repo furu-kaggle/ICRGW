@@ -40,21 +40,27 @@ class maskDataset:
            df_nomask = df_nomask[df_nomask.label_sum==0]
            self.df = pd.concat([df_mask,df_nomask]).reset_index(drop=True)
         self.dup_ids = self.df.dup_id.unique()
-        
-    def __getitem__(self, idx):
-        dup_idx = self.dup_ids[idx]
-        row = self.df[self.df.dup_id == dup_idx].sample(n=1).iloc[0]
+
+        #self.mixup_cand = self.df.groupby("fold_dup_id")["dup_id"].apply(list).to_dict()
+
+    def load_data(self, row):
         sampling_timeid = 4
         image = np.load(row[f"path{sampling_timeid}"] + "image.npy")*255.0
         mask = np.load(row.path4 + "label.npy")
         if (self.mode=="train")&(row.path != "nomask"):
             mask_h = np.load(row.path)
-            mask_h = mask_h/row.human_sum
+            mask_h = mask_h/row.human_sum * 0.5
             mask = (mask + mask_h).clip(0,1)
         if self.transform:
             data = self.transform(image=image, mask=mask)
             image, mask = data["image"], data["mask"].to(torch.float32)
         
+        return image, mask
+        
+    def __getitem__(self, idx):
+        dup_idx = self.dup_ids[idx]
+        rows = self.df[self.df.dup_id == dup_idx]
+        image, mask = self.load_data(rows.sample(n=1).iloc[0])
         return image, mask
     
     def __len__(self):
