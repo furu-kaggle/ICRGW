@@ -11,7 +11,7 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.mit import CFG
+from cfg.effb5_512 import CFG
 
 df = pd.read_csv("data/train.csv").drop(["path"],axis=1)
 pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path4"])
@@ -31,7 +31,7 @@ print(df["path"])
 #     df = pd.merge(df,pdf,on=["record_id"])
 
 from src import Trainer
-for fold in [1]:
+for fold in [0]:
     CFG.fold = fold
     train = df[df.fold != fold].reset_index(drop=True)
     valid = df[df.fold == fold].reset_index(drop=True)

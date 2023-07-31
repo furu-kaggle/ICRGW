@@ -48,8 +48,10 @@ class maskDataset:
         mask = np.load(row.path4 + "label.npy")
         if (self.mode=="train")&(row.path != "nomask"):
             mask_h = np.load(row.path)
-            mask_h = mask_h/row.human_sum * 0.5
-            mask = (mask + mask_h).clip(0,1)
+            mask_h = mask_h/row.human_sum * 0.5         
+            mask = (mask + mask_h)
+            mask[(mask >= 1.0)&(mask <= 1.0 + mask_h/2)] = 0.995
+            mask = mask.clip(0.001,1)
         
         if self.transform:
             data = self.transform(image=image, mask=mask)
@@ -58,8 +60,7 @@ class maskDataset:
         return image, mask
     
     def __len__(self):
-        return len(self.dup_ids)
-    
+        return len(self.dup_ids)    
 
 class timemaskDataset:
     def __init__(self, df, CFG, mode="train"):

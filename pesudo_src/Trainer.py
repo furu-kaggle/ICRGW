@@ -1,4 +1,4 @@
-import os, glob
+import os, glob, math
 import torch
 from torch import nn
 from torch.cuda.amp import autocast
@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch.nn.modules.batchnorm import _BatchNorm
 
-from .model import UNet, MultiTimeUNet
-from .dataset import maskDataset, timemaskDataset
+from .model import UNet
+from .dataset import maskDataset
 
 
 
@@ -30,9 +30,10 @@ class Trainer:
         self.cumulative_mask_true = []
         model = UNet(CFG=CFG).to(CFG.device)
         #try:
-        #   import torch._dynamo
-        #   torch._dynamo.reset()
-        #   self.model = torch.compile(model, mode="max-autotune")
+            #print("start compile")
+            #import torch._dynamo
+            #torch._dynamo.reset()
+        #    self.model = torch.compile(model, mode="max-autotune")
         #except:
         #    print("torch version < 2.0.0 so we don't apply torch.compile ")
         self.model = model
@@ -66,7 +67,7 @@ class Trainer:
         )
         self.lr_scheduler = timm.scheduler.CosineLRScheduler(
             self.optimizer,
-            t_initial=CFG.epochs*len(self.data_loader_train),
+            t_initial=CFG.lr_epochs*len(self.data_loader_train),
             lr_min=CFG.lr_min,
             t_in_epochs=True,
         )
@@ -79,7 +80,7 @@ class Trainer:
         losses = []
         with torch.no_grad():
             pbar = tqdm(enumerate(self.data_loader_validation),total=len(self.data_loader_validation))
-            for i, (images, mask) in pbar:
+            for i, (images, mask, _) in pbar:
                 images = images.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
                 mask = mask.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
                 mask_pred = self.model.validate_forward(images)
@@ -176,12 +177,13 @@ class Trainer:
             scaler = torch.cuda.amp.GradScaler()
             pbar = tqdm(enumerate(self.data_loader_train),total=len(self.data_loader_train))
             self.model.train()
-            for i, (images, mask) in pbar:
+            for i, (images, mask, hard_mask) in pbar:
                 images = images.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
                 mask = mask.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
+                hard_mask = hard_mask.to(self.CFG.device,dtype=torch.float32,non_blocking=True)
                 
                 with autocast():
-                    loss = self.model(images, mask)
+                    loss = self.model(images, mask, hard_mask)
                 scaler.scale(loss).backward()
                 scaler.step(self.optimizer)
                 scaler.update()
@@ -190,6 +192,10 @@ class Trainer:
 
                 total_loss += (loss.detach().item() * mask.size(0))
                 total_nums += mask.size(0)
+                
+                if math.isnan(total_loss):
+                    print("NaN loss encountered. Breaking the loop.")
+                    break
                 
                 pbar.set_description("[loss %f, lr %e]" % (total_loss / total_nums, self.optimizer.param_groups[0]['lr']))
 
@@ -202,6 +208,7 @@ class Trainer:
             print('Train Epoch: {} Average Loss: {:.6f}'.format(e, total_loss/total_nums))
 
             if e >= 0:
+                torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{self.CFG.fold}_last.pt")
                 best_dice_score = self.get_threshold(e)
                 if self.best_score < best_dice_score:
                     self.best_score = best_dice_score
