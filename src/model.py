@@ -22,7 +22,9 @@ class UNet(nn.Module):
             encoder_weights=CFG.encoder_weight if CFG.pretrain else None,
             in_channels=3,        
             classes=CFG.num_classes,
-            activation=None
+            activation=None,
+            encoder_depth=5,
+            decoder_channels = (512, 256, 128, 64, 32)
         )
         self.alpha = CFG.alpha
         if CFG.weight_path is not None:
