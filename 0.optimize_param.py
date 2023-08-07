@@ -10,23 +10,25 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
 
 from segmentation_models_pytorch.encoders import get_preprocessing_params
-from cfg.timm_resnest import CFG
+from cfg.effb7_ns import CFG
 
-df = pd.read_csv("data/train.csv")
-
-
-
+df = pd.read_csv("data/train.csv").drop(["path"],axis=1)
 pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path4"])
 pdf["record_id"] = pdf.path4.apply(lambda x: x.split("/")[-2]).astype(int)
 df = pd.merge(df,pdf,on=["record_id"])
 
-for i in [0,1,2,3,5,6,7]:
-    pdf = pd.DataFrame(glob.glob(f"data/ash{i}/*/"),columns=[f"path{i}"])
-    pdf["record_id"] = pdf[f"path{i}"].apply(lambda x: x.split("/")[-2]).astype(int)
-    df = pd.merge(df,pdf,on=["record_id"])
+ndf = pd.DataFrame(glob.glob("data/ashfloat32/*/label_smooth_*.npy"),columns=["path"])
+ndf["record_id"] = ndf.path.apply(lambda x: x.split("/")[-2]).astype(int)
+df = df.merge(ndf,on=["record_id"],how="left")
+df["path"].fillna("nomask",inplace=True)
 
-train = df[df.fold != 0].reset_index(drop=True)
-valid = df[df.fold == 0].reset_index(drop=True)
+# for i in [0,1,2,3,5,6,7]:
+#     pdf = pd.DataFrame(glob.glob(f"data/ash{i}/*/"),columns=[f"path{i}"])
+#     pdf["record_id"] = pdf[f"path{i}"].apply(lambda x: x.split("/")[-2]).astype(int)
+#     df = pd.merge(df,pdf,on=["record_id"])
+
+train = df[df.fold != 3].reset_index(drop=True)
+valid = df[df.fold == 3].reset_index(drop=True)
 
 from src import Trainer
 class Objective:
@@ -38,9 +40,10 @@ class Objective:
     def __call__(self, trial):
         # suggest parameters
         self.CFG.lr = trial.suggest_float("lr", 1e-3, 8e-3,step=1e-3)
-        self.CFG.alpha = trial.suggest_float("alpha", 0.1, 0.9, step=0.05)
-        self.CFG.enc_ratio = trial.suggest_float("enc_ratio", 0.05, 0.3,step=0.01)
+        self.CFG.alpha = trial.suggest_float("alpha", 0.1, 0.3, step=0.05)
+        self.CFG.enc_ratio = trial.suggest_float("enc_ratio", 0.1, 0.25,step=0.01)
         self.CFG.lr_min = trial.suggest_float("lr_min", 5e-5,5e-4,step=1e-5)
+        self.CFG.ema_decay = trial.suggest_float("ema_decay", 0.99, 0.999,step=0.001)
 
         # create trainer with suggested parameters
         trainer = self.trainer_class(CFG=self.CFG, train=train, valid=valid)
@@ -97,4 +100,4 @@ def optimize(CFG, trainer_class, n_trials=100):
         json.dump(study.best_params, f)
 
 # use the function
-optimize(CFG, Trainer, n_trials=20)
+optimize(CFG, Trainer, n_trials=50)

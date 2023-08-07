@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch.nn.modules.batchnorm import _BatchNorm
 
-from .model import UNet, MultiTimeUNet
-from .dataset import maskDataset, timemaskDataset
+from .model import UNet
+from .dataset import maskDataset
 
 
 
@@ -37,8 +37,8 @@ class Trainer:
            print("torch version < 2.0.0 so we don't apply torch.compile ")
         self.model = model
         self.ema_model = timm.utils.ModelEmaV2(self.model, decay=CFG.ema_decay)
-        group_decay_encoder, group_no_decay_encoder = self.group_weight(self.model.model.encoder)
-        group_decay_decoder, group_no_decay_decoder = self.group_weight(self.model.model.decoder)
+        group_decay_encoder, group_no_decay_encoder = self.group_weight(self.model.encoder)
+        group_decay_decoder, group_no_decay_decoder = self.group_weight(self.model.decoder)
         self.optimizer = optim.AdamW([
             {'params': group_decay_encoder, 'lr': CFG.lr * CFG.enc_ratio},
             {'params': group_no_decay_encoder, 'lr': CFG.lr * CFG.enc_ratio, 'weight_decay':0.0},
@@ -169,7 +169,7 @@ class Trainer:
             epochs: int = 10,
             eval_every: int = 1,
             ):
-  
+        #best_dice_score = self.get_threshold(0)
         for e in range(epochs):
             total_loss = 0
             total_nums = 0
@@ -205,7 +205,7 @@ class Trainer:
                 best_dice_score = self.get_threshold(e)
                 if self.best_score < best_dice_score:
                     self.best_score = best_dice_score
-                    torch.save(self.model.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}_{self.CFG.fold}.pt")
+                    torch.save(self.model.state_dict(), f"checkpoint/model_checkpoint_{best_dice_score:.3f}_{self.CFG.fold}.pt")
                     for path in sorted(glob.glob(f"checkpoint/model_checkpoint_*_{self.CFG.fold}.pt"), reverse=True)[1:]:
                         os.remove(path)
         

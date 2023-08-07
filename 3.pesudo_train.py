@@ -39,7 +39,31 @@ df = pd.merge(df,pdf,on=["record_id"])
 
 df2 = df.copy()
 
-df = pd.concat([df1,df2]).reset_index(drop=True)
+df = pd.read_csv("data/train.csv")[["record_id","mask_sum","has_mask","fold","label_sum","dup_id","human_sum"]]
+pdf = pd.DataFrame(glob.glob("data/pesudo1/**/*_pesudo.npy"),columns=["path"])
+pdf["record_id"] = pdf.path.apply(lambda x: x.split("/")[-1].replace("_pesudo.npy","")).astype(int)
+pdf = pdf.groupby("record_id").path.apply(list).reset_index()
+df = pd.merge(df,pdf,on=["record_id"])
+
+pdf = pd.DataFrame(glob.glob("data/ash1/*/image.npy"),columns=["img_path"])
+pdf["record_id"] = pdf["img_path"].apply(lambda x: x.split("/")[-2]).astype(int)
+df = pd.merge(df,pdf,on=["record_id"])
+
+df3 = df.copy()
+
+df = pd.read_csv("data/train.csv")[["record_id","mask_sum","has_mask","fold","label_sum","dup_id","human_sum"]]
+pdf = pd.DataFrame(glob.glob("data/pesudo7/**/*_pesudo.npy"),columns=["path"])
+pdf["record_id"] = pdf.path.apply(lambda x: x.split("/")[-1].replace("_pesudo.npy","")).astype(int)
+pdf = pdf.groupby("record_id").path.apply(list).reset_index()
+df = pd.merge(df,pdf,on=["record_id"])
+
+pdf = pd.DataFrame(glob.glob("data/ash7/*/image.npy"),columns=["img_path"])
+pdf["record_id"] = pdf["img_path"].apply(lambda x: x.split("/")[-2]).astype(int)
+df = pd.merge(df,pdf,on=["record_id"])
+
+df4 = df.copy()
+
+df = pd.concat([df1,df2,df3,df4]).reset_index(drop=True)
 
 vdf = pd.read_csv("data/train.csv",index_col=0)
 pdf = pd.DataFrame(glob.glob("data/ashfloat32/*/"),columns=["path"])
@@ -57,6 +81,9 @@ paths = [
 from pesudo_src import Trainer
 
 for fold, path in enumerate(paths):
+    print(f"start fold{fold}")
+    if fold ==0:
+        pass
     CFG.weight_path = path
     CFG.fold = fold
     train = df[df.fold == CFG.fold].reset_index(drop=True)

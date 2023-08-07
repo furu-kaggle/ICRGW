@@ -3,7 +3,7 @@ import torch
 
 class CFG:
     seed          = 101
-    backbone      = 'timm-efficientnet-b5'
+    backbone      = 'timm-efficientnet-b7'
     pretrain      = True
     encoder_weight= "noisy-student" #"imagenet" #timm [imagenet / advprop / noisy-student]
     pp_params     = get_preprocessing_params(backbone, pretrained=encoder_weight)
@@ -11,20 +11,20 @@ class CFG:
     crop_size     = [384, 384]
     sub_img_size  = [256, 256]
     valid_size    = [384, 384]
-    epochs        = 30
-    lr_epochs     = 30
-    batch_size    = 16
-    lr            = 3e-4
-    lr_min        = 5e-6
-    enc_ratio     = 1
+    epochs        = 60
+    lr_epochs     = 60
+    batch_size    = 8
+    lr            = 0.005
+    lr_min        = 0.00027
+    enc_ratio     = 0.11
     weight_decay  = 0.01
-    ema_decay     = 0.99
+    ema_decay     = 0.992
     fold          = 0
     num_classes   = 1
-    alpha         = 0.05
+    alpha         = 0.1
     device        = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     train         = True
     probe_thre    = True
     img_show      = False
-    weight_path   = "checkpoint/model_base_0.684_0.pt"
+    weight_path   = None
     inp_mode = 'bilinear'
